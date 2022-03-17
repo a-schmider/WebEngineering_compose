@@ -42,7 +42,7 @@ services:
       - ./frontend/config.json:/usr/share/nginx/html/assets/config.json:Z
 
   backend:
-    image: ${BACKEND_IMAGE_REPOSITORY}:${BACKEND_IMAGE_VERSION}
+    image: ${BACKEND_JWT_IMAGE_REPOSITORY}:${BACKEND_JWT_IMAGE_VERSION}
     environment:
       KEYCLOAK_HOST: "traefik"
       KEYCLOAK_REALM: "biletado"
@@ -52,7 +52,9 @@ services:
     restart: unless-stopped
 
   backend-assets:
-    image: ${BACKEND_IMAGE_REPOSITORY}:${BACKEND_IMAGE_VERSION}
+    image: ${BACKEND_ASSETS_IMAGE_REPOSITORY}:${BACKEND_ASSETS_IMAGE_VERSION}
+    depends_on:
+      - postgres
     environment:
       KEYCLOAK_HOST: "traefik"
       KEYCLOAK_REALM: "biletado"
@@ -67,7 +69,9 @@ services:
     restart: unless-stopped
 
   backend-reservations:
-    image: ${BACKEND_IMAGE_REPOSITORY}:${BACKEND_IMAGE_VERSION}
+    image: ${BACKEND_RESERVATIONS_IMAGE_REPOSITORY}:${BACKEND_RESERVATIONS_IMAGE_VERSION}
+    depends_on:
+      - postgres
     environment:
       KEYCLOAK_HOST: "traefik"
       KEYCLOAK_REALM: "biletado"
@@ -82,11 +86,6 @@ services:
     restart: unless-stopped
 
   traefik:
-    depends_on:
-      - keycloak
-      - frontend
-      - backend
-      - jaeger
     image: traefik:${TRAEFIK_IMAGE_VERSION}
     ports:
       - "8080:8080"
@@ -95,9 +94,10 @@ services:
     volumes:
       - ./traefik/traefik.yaml:/etc/traefik/traefik.yaml:Z
       - ./traefik/traefik.conf.d/:/etc/traefik/traefik.conf.d/:Z
-    #extra_hosts:
+    extra_hosts:
     # necessary on linux to access local backends through traefik via e.g. `url: http://host.docker.internal:9000/`
-    # - host.docker.internal:host-gateway
+     - host.docker.internal:host-gateway
+
   jaeger:
     image: jaegertracing/all-in-one:${JAEGER_IMAGE_VERSION}
     environment:
@@ -106,6 +106,7 @@ services:
       - "5778"
       - "6831/udp"
       - "16686"
+    restart: unless-stopped
 
   pgadmin4:
     restart: unless-stopped
@@ -134,13 +135,13 @@ services:
     depends_on:
       - postgres
 
-  swagger-ui:
+  apidocs:
     restart: unless-stopped
-    image: swaggerapi/swagger-ui
+    image: registry.gitlab.com/biletado/apidocs:${APIDOCS_IMAGE_VERSION}
     expose:
       - "8080"
     environment:
-      CONFIG_URL: ./swagger-config.json
-      BASE_URL: /swagger-ui
+      BASE_URL: /apidocs
     volumes:
-      - ./swagger-ui/swagger-config.json:/usr/share/nginx/html/swagger-config.json:Z
+      - ./apidocs/servers.yaml:/tmp/servers.yaml:Z
+      - ./apidocs/docker-entrypoint.d/40-merge-servers.sh:/docker-entrypoint.d/40-merge-servers.sh:Z
